@@ -371,6 +371,7 @@
           <button type="button" data-v="join" aria-pressed="false">Join with code</button>
           <button type="button" data-v="code" aria-pressed="false">By code</button>
         </div>
+        <label class="check" id="lb-usecode"><input type="checkbox" id="cb-usecode" checked> Use a 4-letter code</label>
         <input id="net-group" type="text" maxlength="24" list="grp-list" autocomplete="off" placeholder="Group name (optional), e.g. Friday club" aria-label="Group name for this match">
         <datalist id="grp-list"></datalist>
         <input id="net-code" type="text" inputmode="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Game code" hidden>
@@ -430,7 +431,7 @@
       </div>
     </details>
 
-    <p class="netmsg fine" id="privacy-note">Privacy: your games, rating and settings are saved only on this device. Online play uses a free public connection service only to introduce you and your friend; after that, moves go straight between your two devices. The chess AI sends your question to Google (or Wikipedia) when you ask it.</p>
+    <p class="netmsg fine" id="privacy-note">Privacy: your games, rating and settings are saved only on this device. Online play uses a free public connection service only to introduce you and your friend; after that, moves go straight between your two devices. Find a game with no group name can match you with a stranger. The chess AI sends your question to Google (or Wikipedia) when you ask it.</p>
     <div class="record" id="record"></div>
     <div class="row"><button class="btn" id="btn-stats" type="button">Stats and ladder</button><button class="btn" id="btn-hist" type="button">My games</button><button class="btn" id="btn-sound-home" type="button">Sound on</button><button class="btn" id="btn-music-home" type="button">Music on</button></div>
   </section>
@@ -1475,14 +1476,14 @@ var Engine = (function () {
   function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
 
   /* ---------- saved settings, rating and puzzle progress ---------- */
-  var cfg = { mode: 'ai', side: 'w', level: 'jake', tc: 'none', autoFlip: false, board: 'slate', pieces: 'classic', opn: 'italian', net: 'create', tourx: false, todds: 'none', c960: false, coach: false, blind: false, explorer: true, arrows: true, large: false, face: false, pack: 'classic', hand: 'none', sound: true, music: true };
+  var cfg = { mode: 'ai', side: 'w', level: 'jake', tc: 'none', autoFlip: false, board: 'slate', pieces: 'classic', opn: 'italian', net: 'create', nocode: false, tourx: false, todds: 'none', c960: false, coach: false, blind: false, explorer: true, arrows: true, large: false, face: false, pack: 'classic', hand: 'none', sound: true, music: true };
   (function () {
     var sv = lsGet('pocket-chess') || {};
     if (sv.mode === 'ai' || sv.mode === '2p' || sv.mode === 'puz' || sv.mode === 'opn') cfg.mode = sv.mode;
     if (typeof sv.opn === 'string') cfg.opn = sv.opn;
     cfg.c960 = sv.c960 === true; cfg.todds = ['half', 'quarter'].indexOf(sv.todds) >= 0 ? sv.todds : 'none'; cfg.tourx = sv.tourx === true; cfg.coach = sv.coach === true; cfg.blind = sv.blind === true; cfg.explorer = sv.explorer !== false; cfg.arrows = sv.arrows !== false; cfg.large = sv.large === true; cfg.face = sv.face === true; cfg.pack = ['classic', 'soft', 'wood', 'quiet'].indexOf(sv.pack) >= 0 ? sv.pack : 'classic';
     cfg.hand = ['pawn', 'knight', 'rook', 'queen'].indexOf(sv.hand) >= 0 ? sv.hand : 'none';
-    cfg.sound = sv.sound !== false; cfg.music = sv.music !== false;
+    cfg.sound = sv.sound !== false; cfg.music = sv.music !== false; cfg.nocode = sv.nocode === true;
     if (['w', 'b', 'r'].indexOf(sv.side) >= 0) cfg.side = sv.side;
     var legacy = { beginner: 'jake', casual: 'max', strong: 'leo' }, lv = legacy[sv.level] || sv.level;
     if (ALLOPP.some(function (o) { return o.id === lv; })) cfg.level = lv;
@@ -2306,7 +2307,7 @@ var Engine = (function () {
     if (G.mode === 'puz' && G.puz.kind === 'opn') return OPENINGS[G.puz.i].name + ' \u00B7 playing ' + (G.human === 1 ? 'White' : 'Black');
     if (G.mode === 'puz') return G.puz.daily ? 'Daily puzzle · Mate in ' + G.puz.n : 'Puzzle ' + (G.puz.i + 1) + ' of ' + PUZZLES.length + ' · Mate in ' + G.puz.n;
     if (G.mode === 'code') return 'Play by code';
-    if (isNet()) return 'Online \u00B7 code ' + G.net.code + (G.net.group ? ' \u00B7 ' + G.net.group : '');
+    if (isNet()) return G.net.open ? 'Online \u00B7 open game' : G.net.nocode ? 'Online \u00B7 group ' + G.net.group : 'Online \u00B7 code ' + G.net.code + (G.net.group ? ' \u00B7 ' + G.net.group : '');
     var tc = G.opts.tc && G.opts.tc !== 'none' ? ' · ' + TC_LABEL[G.opts.tc] : '';
     if (G.mode === '2p') return 'Two players' + tc;
     if (G.opts.endgame !== undefined) return 'Endgame \u00B7 ' + ENDGAMES[G.opts.endgame].name;
@@ -2398,8 +2399,8 @@ var Engine = (function () {
       }
     }
     else if (isNet() && G.net.wait) {
-      title = G.net.role === 'host' ? 'Game code ' + G.net.code : 'Joining ' + G.net.code;
-      sub = G.net.role === 'host' ? 'Waiting for your friend. They choose Play a friend, then Join with code. Keep this page open.' : 'Looking for the host. Check the code if this takes more than a few seconds.';
+      title = G.net.open ? (G.net.role === 'host' ? 'Waiting for a player' : 'Finding a player') : G.net.nocode ? (G.net.role === 'host' ? 'Group ' + G.net.group : 'Joining ' + G.net.group) : G.net.role === 'host' ? 'Game code ' + G.net.code : 'Joining ' + G.net.code;
+      sub = G.net.open ? (G.net.role === 'host' ? 'You are in line. The next person who taps Find a game with no group name will be matched with you. Keep this page open.' : 'Connecting you to the player who is waiting.') : G.net.nocode ? (G.net.role === 'host' ? 'Waiting for your friend. They choose Play a friend, turn off the code, type the group name "' + G.net.group + '" and tap Play in group. Keep this page open.' : 'Looking for your friend. Check the group name if this takes more than a few seconds.') : G.net.role === 'host' ? 'Waiting for your friend. They choose Play a friend, then Join with code. Keep this page open.' : 'Looking for the host. Check the code if this takes more than a few seconds.';
     }
     else if (G.over) {
       var o = G.over;
@@ -2690,7 +2691,9 @@ var Engine = (function () {
   var netRoom = null, netOff = [], netTimer = null, netBusy = false;
   function netMsg(t, bad) { var e = $('net-msg'); if (!e) return; e.textContent = t || ''; e.className = 'netmsg' + (bad ? ' bad' : ''); }
   function randCode() { var A = 'ABCDEFGHJKMNPQRSTUVWXYZ', s = ''; for (var i = 0; i < 4; i++) s += A.charAt(Math.floor(Math.random() * A.length)); return s; }
+  var netLobby = null;
   function netLeave() {
+    if (netLobby) { try { netLobby.destroy(); } catch (e) {} netLobby = null; }
     netOff.forEach(function (f) { try { f(); } catch (e) {} }); netOff = [];
     if (netTimer) { clearInterval(netTimer); netTimer = null; }
     if (netRoom) { try { var p = netRoom.leave(); if (p && p.catch) p.catch(function () {}); } catch (e) {} netRoom = null; }
@@ -2735,12 +2738,12 @@ var Engine = (function () {
     if (n.drawIn) { endGame({ kind: 'agree' }); netSend('sync'); }
     else if (!n.drawOut) { n.drawOut = true; netSend('draw'); render(); }
   }
-  function netBegin(room, role, code, side, group) {
+  function netBegin(room, role, code, side, group, nocode) {
     netLeave(); netRoom = room;
     var human = role === 'host' ? (side === 'b' ? -1 : side === 'r' ? (Math.random() < 0.5 ? 1 : -1) : 1) : -1;
     var S = freshState(E.START_FEN);
     G = baseGame({ mode: 'net', tc: 'none', level: 'jake' }, S, human, human === -1);
-    G.net = { role: role, code: code, opp: null, wait: true, here: false, drawIn: false, drawOut: false, group: role === 'host' ? (group || '') : '' };
+    G.net = { role: role, code: code, opp: null, wait: true, here: false, drawIn: false, drawOut: false, nocode: !!nocode, open: !!nocode && !group, group: (role === 'host' || nocode) ? (group || '') : '' };
     if (G.net.group) grpTouch(G.net.group);
     G.moves = legal(S);
     var g = G;
@@ -2812,27 +2815,36 @@ var Engine = (function () {
       leave: function () { dead = true; Object.keys(conns).forEach(function (k) { try { conns[k].close(); } catch (e) {} }); conns = {}; try { peer.destroy(); } catch (e) {} }
     };
   }
-  function netStart(role, code, side) {
+  function grpSlug(v) { return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24); }
+  function netStart(role, code, side, nocode) {
     if (netBusy) return;
     var PeerC = window.peerjs && window.peerjs.Peer;
     if (!PeerC) { netMsg('Online play could not load. Reload the page, or choose By code.', true); return; }
     if (navigator.onLine === false) { netMsg('You look to be offline. Connect to the internet, or choose By code.', true); return; }
-    var group = role === 'host' ? grpClean($('net-group').value) : '';
+    var group = (role === 'host' || nocode) ? grpClean($('net-group').value) : '';
+    var open = !!nocode && !grpSlug(group);
+    var key = nocode && !open ? 'g-' + grpSlug(group) : '';
+    if (open) group = '';
     netBusy = true; netMsg('Connecting…');
-    var done = false, tries = 0, peer = null, timer = null;
+    var done = false, tries = 0, peer = null, timer = null, hostTried = false, joinAgain = false, r = role === 'host' ? 'host' : 'guest';
     function fail(m) { if (done) return; done = true; clearTimeout(timer); netBusy = false; try { peer && peer.destroy(); } catch (e) {} netMsg(m, true); }
-    function ok(room, c) { if (done) { try { room.leave(); } catch (e) {} return; } done = true; clearTimeout(timer); netBusy = false; netMsg(''); netBegin(room, role, c, side, group); }
-    timer = setTimeout(function () { fail(role === 'host' ? 'Could not reach the connection service. Check your internet and try again.' : 'No answer for code ' + code + '. Check the code, and make sure your friend is on the waiting screen.'); }, 15000);
+    function ok(room, c) { if (done) { try { room.leave(); } catch (e) {} return; } done = true; clearTimeout(timer); netBusy = false; netMsg(''); netBegin(room, r, nocode ? '' : c, side, group, nocode); }
+    timer = setTimeout(function () { fail(open ? 'Could not find a game right now. Check your internet and try again.' : nocode ? 'Could not connect. Check your internet and try again.' : role === 'host' ? 'Could not reach the connection service. Check your internet and try again.' : 'No answer for code ' + code + '. Check the code, and make sure your friend is on the waiting screen.'); }, open ? 30000 : 20000);
     function openHost(c) {
+      r = 'host';
       var p = peer = new PeerC(PEER_PREFIX + c.toLowerCase(), { debug: 0 });
       p.on('open', function () { if (p === peer) ok(makeRoom(p, true), c); });
       p.on('error', function (e) {
         if (p !== peer || done) return;
-        if (e && e.type === 'unavailable-id' && tries++ < 6) { try { p.destroy(); } catch (x) {} openHost(randCode()); return; }
+        if (e && e.type === 'unavailable-id') {
+          if (nocode) { try { p.destroy(); } catch (x) {} if (!joinAgain) { joinAgain = true; openGuest(key); } else fail('That group is busy right now. Try again in a moment.'); return; }
+          if (tries++ < 6) { try { p.destroy(); } catch (x) {} openHost(randCode()); return; }
+        }
         fail('Could not start the game. Check your internet and try again.');
       });
     }
     function openGuest(c) {
+      r = 'guest';
       var p = peer = new PeerC(undefined, { debug: 0 });
       p.on('open', function () {
         if (p !== peer || done) return;
@@ -2842,14 +2854,69 @@ var Engine = (function () {
       });
       p.on('error', function (e) {
         if (p !== peer || done) return;
+        if (nocode && e && e.type === 'peer-unavailable' && !hostTried) { hostTried = true; try { p.destroy(); } catch (x) {} openHost(key); return; }
         fail(e && e.type === 'peer-unavailable' ? 'No game found with code ' + c + '. Check the code, and make sure your friend has started the game and is waiting.' : 'Could not connect. Check your internet and try again.');
       });
     }
-    if (role === 'host') openHost(code); else openGuest(code);
+    /* open matching: the first person holds the lobby and hosts a private game; the next arrival is sent to that game and the lobby is freed */
+    var LOBBY = PEER_PREFIX + 'open-lobby', lobbyTries = 0;
+    function openMatch() {
+      if (done) return;
+      if (lobbyTries++ > 5) { fail('Could not find a game right now. Try again in a moment.'); return; }
+      var lp = peer = new PeerC(LOBBY, { debug: 0 });
+      lp.on('open', function () {
+        if (lp !== peer || done) { try { lp.destroy(); } catch (x) {} return; }
+        var gid = 'o' + Math.random().toString(36).slice(2, 12), used = false;
+        var hp = new PeerC(PEER_PREFIX + gid, { debug: 0 });
+        hp.on('error', function () { if (!done) { try { lp.destroy(); hp.destroy(); } catch (x) {} fail('Could not start the game. Check your internet and try again.'); } });
+        hp.on('open', function () {
+          if (done) { try { hp.destroy(); lp.destroy(); } catch (x) {} return; }
+          peer = hp;
+          lp.on('connection', function (c) {
+            c.on('open', function () {
+              if (used) { try { c.send({ t: 'retry' }); } catch (x) {} return; }
+              used = true; try { c.send({ t: 'goto', d: gid }); } catch (x) {}
+              setTimeout(function () { try { lp.destroy(); } catch (x) {} if (netLobby === lp) netLobby = null; }, 1500);
+            });
+          });
+          lp.on('disconnected', function () { if (!used) { try { lp.reconnect(); } catch (x) {} } });
+          lp.on('error', function () {});
+          r = 'host'; ok(makeRoom(hp, true), gid); netLobby = lp;
+        });
+      });
+      lp.on('error', function (e) {
+        if (lp !== peer || done) return;
+        try { lp.destroy(); } catch (x) {}
+        if (e && e.type === 'unavailable-id') { lobbyGuest(); return; }
+        fail('Could not connect. Check your internet and try again.');
+      });
+    }
+    function lobbyGuest() {
+      var p = peer = new PeerC(undefined, { debug: 0 }), got = false, t = null;
+      function again() { clearTimeout(t); if (p !== peer || done) return; try { p.destroy(); } catch (x) {} openMatch(); }
+      p.on('open', function () {
+        if (p !== peer || done) return;
+        var c = p.connect(LOBBY, { reliable: true, serialization: 'json' });
+        t = setTimeout(function () { if (!got) again(); }, 7000);
+        c.on('data', function (m) {
+          if (got || !m || typeof m !== 'object') return;
+          if (m.t === 'retry') { got = true; again(); return; }
+          if (m.t === 'goto' && typeof m.d === 'string' && /^o[a-z0-9]{1,12}$/.test(m.d)) {
+            got = true; clearTimeout(t); try { c.close(); } catch (x) {}
+            var c2 = p.connect(PEER_PREFIX + m.d, { reliable: true, serialization: 'json' });
+            c2.on('open', function () { if (p === peer && !done) { r = 'guest'; ok(makeRoom(p, false, c2), m.d); } });
+            c2.on('error', again);
+          }
+        });
+      });
+      p.on('error', function () { again(); });
+    }
+    if (open) openMatch(); else if (nocode) openGuest(key); else if (role === 'host') openHost(code); else openGuest(code);
   }
   function netGo() {
     netMsg('');
     if (cfg.net === 'code') { codeGo(); return; }
+    if (cfg.nocode) { netStart('guest', '', cfg.side, true); return; }
     if (cfg.net === 'join') {
       var c = $('net-code').value.toUpperCase().replace(/[^A-Z]/g, '');
       if (c.length !== 4) { netMsg('Enter the 4-letter code your friend sees.', true); return; }
@@ -3259,10 +3326,15 @@ var Engine = (function () {
     if (!cfg.eg) { var fe = ENDGAMES.filter(function (x) { return !egs.done[x.id]; })[0]; cfg.eg = (fe || ENDGAMES[0]).id; }
     $('f-end').hidden = !endm; $('f-tour').hidden = !tourm;
     press('seg-net', cfg.net);
-    $('f-net').hidden = !netm; $('net-code').hidden = !(netm && cfg.net === 'join'); $('code-start').hidden = !(netm && cfg.net === 'code');
+    $('f-net').hidden = !netm; $('net-code').hidden = !(netm && cfg.net === 'join' && !cfg.nocode); $('code-start').hidden = !(netm && cfg.net === 'code');
     $('net-note').textContent = cfg.net === 'code' ? 'Works in any browser, no connection needed. After each move you send a code by text or chat, and your friend pastes it in.' : cfg.net === 'join' ? 'Type the 4-letter code your friend sees on their screen. You both need this page open at the same time.' : 'Tap Create game, then send the 4-letter code to your friend. They choose Play a friend, then Join with code. You both need this page open at the same time. Add a group name to keep your games with the same people together.';
-    $('net-group').hidden = !(netm && cfg.net === 'create'); renderGroups(netm && cfg.net !== 'code');
-    $('f-side').hidden = !(ai || (netm && cfg.net === 'create')); $('f-hand').hidden = !ai; $('f-opp').hidden = !ai; $('f-time').hidden = cfg.mode === 'study' || puz || opnm || netm || endm || tourm; $('f-flip').hidden = !two; $('puz-info').hidden = !puz; $('f-opn').hidden = !opnm;
+    var nc = netm && cfg.nocode && cfg.net !== 'code';
+    $('cb-usecode').checked = !cfg.nocode; $('lb-usecode').hidden = !(netm && cfg.net !== 'code');
+    $('net-group').hidden = !(netm && cfg.net !== 'code' && (cfg.net === 'create' || cfg.nocode));
+    $('net-group').placeholder = 'Group name (optional), e.g. Friday club';
+    if (nc) $('net-note').textContent = 'No code needed. Leave the name empty and you are matched with whoever else is looking for a game (it could be a stranger). Or type a group name, and you are only matched with people who type the same name.';
+    renderGroups(netm && cfg.net !== 'code');
+    $('f-side').hidden = !(ai || (netm && (cfg.net === 'create' || (cfg.nocode && cfg.net !== 'code')))); $('f-hand').hidden = !ai; $('f-opp').hidden = !ai; $('f-time').hidden = cfg.mode === 'study' || puz || opnm || netm || endm || tourm; $('f-flip').hidden = !two; $('puz-info').hidden = !puz; $('f-opn').hidden = !opnm;
     $('cb-flip').checked = cfg.autoFlip;
     $('f-todds').hidden = !(ai && cfg.tc !== 'none');
     $('todds-note').textContent = cfg.todds === 'none' ? '' : 'The computer starts with ' + (cfg.todds === 'half' ? 'half' : 'a quarter of') + ' your time. These games are unrated.';
@@ -3270,7 +3342,7 @@ var Engine = (function () {
     $('f-coach').hidden = !ai; $('cb-coach').checked = cfg.coach; $('f-blind').hidden = !ai; $('cb-blind').checked = cfg.blind;
     $('cb-ex').checked = cfg.explorer; $('cb-arr').checked = cfg.arrows; $('cb-large').checked = cfg.large; $('cb-face').checked = cfg.face; press('seg-pack', cfg.pack);
     $('f-study').hidden = cfg.mode !== 'study'; $('app').classList.toggle('large', cfg.large);
-    $('btn-start').textContent = cfg.mode === 'study' ? 'Open the game' : cfg.mode === 'setup' ? 'Open the editor' : endm ? 'Start lesson' : tourm ? (tour.i >= TO().length ? 'Start new tournament' : tour.i > 0 ? 'Continue tournament' : 'Start tournament') : netm ? (cfg.net === 'join' ? 'Join game' : cfg.net === 'code' ? 'Start by code' : 'Create game') : opnm ? 'Start lesson' : puz ? (pzDoneCount() ? 'Continue puzzles' : 'Start puzzles') : 'Start game';
+    $('btn-start').textContent = cfg.mode === 'study' ? 'Open the game' : cfg.mode === 'setup' ? 'Open the editor' : endm ? 'Start lesson' : tourm ? (tour.i >= TO().length ? 'Start new tournament' : tour.i > 0 ? 'Continue tournament' : 'Start tournament') : netm ? (cfg.net === 'code' ? 'Start by code' : cfg.nocode ? 'Find a game' : cfg.net === 'join' ? 'Join game' : 'Create game') : opnm ? 'Start lesson' : puz ? (pzDoneCount() ? 'Continue puzzles' : 'Start puzzles') : 'Start game';
     var info = $('puz-info');
     info.innerHTML = '';
     var big = document.createElement('b'); big.textContent = pzDoneCount() + ' of ' + PUZZLES.length;
@@ -3292,6 +3364,7 @@ var Engine = (function () {
       syncSetup();
     });
   });
+  $('cb-usecode').addEventListener('change', function () { cfg.nocode = !$('cb-usecode').checked; saveCfg(); netMsg(''); syncSetup(); });
   $('cb-960').addEventListener('change', function () { cfg.c960 = $('cb-960').checked; });
   $('cb-flip').addEventListener('change', function () { cfg.autoFlip = $('cb-flip').checked; });
   $('btn-start').addEventListener('click', function () {
